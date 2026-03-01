@@ -81,7 +81,7 @@ async def get_heygen_token():
 
     # Prefer LiveAvatar API (new platform)
     if settings.liveavatar_api_key:
-        avatar_id = "Wayne_20240711"
+        avatar_id = "dd73ea75-1218-4ef3-92ce-606d5f7fbc0a"  # Wayne (public)
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 "https://api.liveavatar.com/v1/sessions/token",

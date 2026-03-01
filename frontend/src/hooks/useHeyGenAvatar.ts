@@ -5,8 +5,8 @@ import {
   AgentEventsEnum,
 } from "@heygen/liveavatar-web-sdk";
 
-// Default avatar ID — override via VITE_HEYGEN_AVATAR_ID env var.
-const DEFAULT_AVATAR_ID = import.meta.env.VITE_HEYGEN_AVATAR_ID || "Wayne_20240711";
+// Default avatar UUID — override via VITE_HEYGEN_AVATAR_ID env var.
+const DEFAULT_AVATAR_ID = import.meta.env.VITE_HEYGEN_AVATAR_ID || "dd73ea75-1218-4ef3-92ce-606d5f7fbc0a"; // Wayne (public)
 
 // How long to wait for SESSION_STREAM_READY before giving up (ms)
 const AVATAR_TIMEOUT_MS = 15_000;
