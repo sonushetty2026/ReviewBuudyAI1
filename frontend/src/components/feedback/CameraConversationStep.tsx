@@ -33,7 +33,7 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
 
   const { cameraVideoRef, isCameraActive, startCamera, stopCamera } = useCamera();
 
-  const { videoRef: avatarVideoRef, isAvatarReady, speakText, startAvatar, stopAvatar } =
+  const { videoRef: avatarVideoRef, isAvatarReady, speakText, startAvatar, stopAvatar, error: avatarError } =
     useHeyGenAvatar();
 
   const onTranscript = useCallback(
@@ -48,7 +48,7 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
     [sessionId]
   );
 
-  const { isRecording, startRecording, stopRecording, permissionDenied } =
+  const { isRecording, startRecording, stopRecording, permissionDenied, error: audioError } =
     useAudioRecorder({ sessionId, onTranscript });
 
   // Start camera and avatar on mount
@@ -92,12 +92,14 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
     }
   }, [session?.greeting]);
 
-  // Start recording if voice mode and avatar ready
+  // Start recording when avatar is ready OR when avatar has failed (don't block voice on HeyGen)
   useEffect(() => {
-    if (inputMode === "voice" && isAvatarReady && !isRecording && !permissionDenied) {
-      startRecording();
+    if (inputMode === "voice" && !isRecording && !permissionDenied) {
+      if (isAvatarReady || avatarError) {
+        startRecording();
+      }
     }
-  }, [inputMode, isAvatarReady]);
+  }, [inputMode, isAvatarReady, avatarError]);
 
   // If mic denied, switch to text input (camera stays)
   useEffect(() => {
@@ -120,7 +122,7 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
   }, [showGuidance, cameraReady]);
 
   const handleSendMessage = async (content: string, source: string = "text") => {
-    if (!content.trim() || sending) return;
+    if (!content.trim() || sending || completing) return;
     setSending(true);
 
     addMessage({ role: "user", content, source: source as "voice" | "text" });
@@ -320,37 +322,42 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
             </button>
           </form>
         ) : (
-          <div className="px-4 py-4 flex items-center justify-center gap-4">
-            <button
-              onClick={() => {
-                if (isRecording) {
-                  stopRecording();
-                } else {
-                  startRecording();
-                }
-              }}
-              className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                isRecording
-                  ? "bg-red-500 animate-pulse"
-                  : "bg-white/90"
-              }`}
-            >
-              <svg
-                className={`w-8 h-8 ${isRecording ? "text-white" : ""}`}
-                style={!isRecording ? { color: business?.branding.primary_color } : undefined}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          <div className="px-4 py-4 flex flex-col items-center gap-2">
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={() => {
+                  if (isRecording) {
+                    stopRecording();
+                  } else {
+                    startRecording();
+                  }
+                }}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-lg ${
+                  isRecording
+                    ? "bg-red-500 animate-pulse"
+                    : "bg-white/90"
+                }`}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setInputMode("text")}
-              className="px-3 py-2 bg-white/70 backdrop-blur-sm rounded-full text-xs font-medium text-gray-700"
-            >
-              Type instead
-            </button>
+                <svg
+                  className={`w-8 h-8 ${isRecording ? "text-white" : ""}`}
+                  style={!isRecording ? { color: business?.branding.primary_color } : undefined}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setInputMode("text")}
+                className="px-3 py-2 bg-white/70 backdrop-blur-sm rounded-full text-xs font-medium text-gray-700"
+              >
+                Type instead
+              </button>
+            </div>
+            {audioError && (
+              <p className="text-xs text-red-300 text-center">{audioError}</p>
+            )}
           </div>
         )}
       </div>

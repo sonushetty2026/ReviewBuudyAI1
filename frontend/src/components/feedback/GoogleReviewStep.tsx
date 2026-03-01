@@ -11,12 +11,21 @@ export default function GoogleReviewStep({ sessionId }: Props) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyAndOpen = async () => {
+    // IMPORTANT: window.open() MUST be called synchronously before any await,
+    // otherwise iOS Safari loses the user gesture context and blocks the popup.
+    if (googleReviewUrl) {
+      window.open(googleReviewUrl, "_blank");
+    }
+
+    // Track click (async after window.open is fine)
+    await flowApi.recordGoogleClicked(sessionId).catch(() => {});
+
     // Copy review text to clipboard
     try {
       await navigator.clipboard.writeText(reviewText);
       setCopied(true);
     } catch {
-      // Fallback for older browsers
+      // Fallback for older browsers / HTTP
       const textarea = document.createElement("textarea");
       textarea.value = reviewText;
       document.body.appendChild(textarea);
@@ -24,14 +33,6 @@ export default function GoogleReviewStep({ sessionId }: Props) {
       document.execCommand("copy");
       document.body.removeChild(textarea);
       setCopied(true);
-    }
-
-    // Track click
-    await flowApi.recordGoogleClicked(sessionId).catch(() => {});
-
-    // Open Google in new tab
-    if (googleReviewUrl) {
-      window.open(googleReviewUrl, "_blank");
     }
 
     // Move to return check after a moment
