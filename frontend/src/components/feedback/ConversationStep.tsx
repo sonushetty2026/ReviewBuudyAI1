@@ -4,6 +4,11 @@ import { useFlowStore } from "../../stores/flowStore";
 import { useHeyGenAvatar } from "../../hooks/useHeyGenAvatar";
 import { useAudioRecorder } from "../../hooks/useAudioRecorder";
 
+// Session protection constants
+const MAX_SESSION_MS = 5 * 60 * 1000; // 5-minute hard cap
+const IDLE_WARNING_MS = 90 * 1000; // 90-second idle → "Still there?"
+const IDLE_KILL_MS = 2 * 60 * 1000; // 2-minute idle → auto-kill
+
 interface Props {
   sessionId: string;
 }
@@ -25,7 +30,13 @@ export default function ConversationStep({ sessionId }: Props) {
   const [sending, setSending] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
+  const [idleWarning, setIdleWarning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const greetingAddedRef = useRef(false);
+  const completingRef = useRef(false);
+
+  // Ref for stale-closure-safe access to latest handler
+  const handleSendRef = useRef<((content: string, source?: string) => Promise<void>) | null>(null);
 
   const { videoRef, isAvatarReady, speakText, startAvatar, stopAvatar, error: avatarError } =
     useHeyGenAvatar();
@@ -34,23 +45,58 @@ export default function ConversationStep({ sessionId }: Props) {
     (text: string, isFinal: boolean) => {
       if (isFinal) {
         setInterimTranscript("");
-        handleSendMessage(text, "voice");
+        handleSendRef.current?.(text, "voice");
       } else {
         setInterimTranscript(text);
       }
     },
-    [sessionId]
+    []
   );
 
   const { isRecording, startRecording, stopRecording, permissionDenied, error: audioError } =
     useAudioRecorder({ sessionId, onTranscript });
 
-  // Start avatar on mount
+  // --- Session timeout protection ---
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleKillRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearAllTimers = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (idleKillRef.current) clearTimeout(idleKillRef.current);
+    if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
+  }, []);
+
+  const resetIdleTimers = useCallback(() => {
+    setIdleWarning(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (idleKillRef.current) clearTimeout(idleKillRef.current);
+
+    idleTimerRef.current = setTimeout(() => {
+      setIdleWarning(true);
+    }, IDLE_WARNING_MS);
+
+    idleKillRef.current = setTimeout(() => {
+      if (!completingRef.current) {
+        handleComplete();
+      }
+    }, IDLE_KILL_MS);
+  }, []);
+
+  // Start avatar on mount + arm session timers
   useEffect(() => {
     startAvatar();
+    sessionTimerRef.current = setTimeout(() => {
+      if (!completingRef.current) {
+        handleComplete();
+      }
+    }, MAX_SESSION_MS);
+    resetIdleTimers();
+
     return () => {
       stopAvatar();
       stopRecording();
+      clearAllTimers();
     };
   }, []);
 
@@ -61,14 +107,15 @@ export default function ConversationStep({ sessionId }: Props) {
     }
   }, [isAvatarReady, session?.greeting]);
 
-  // Add greeting to messages on mount
+  // Add greeting to messages — guarded against StrictMode double-fire
   useEffect(() => {
-    if (session?.greeting && messages.length === 0) {
+    if (session?.greeting && messages.length === 0 && !greetingAddedRef.current) {
+      greetingAddedRef.current = true;
       addMessage({ role: "assistant", content: session.greeting, source: "text" });
     }
   }, [session?.greeting]);
 
-  // Start recording when avatar is ready OR when avatar has failed (don't block voice on HeyGen)
+  // Start recording when avatar is ready OR when avatar has failed
   useEffect(() => {
     if (inputMode === "voice" && !isRecording && !permissionDenied) {
       if (isAvatarReady || avatarError) {
@@ -82,16 +129,10 @@ export default function ConversationStep({ sessionId }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, interimTranscript]);
 
-  // Handle permission denied → switch to text
-  useEffect(() => {
-    if (permissionDenied && inputMode === "voice") {
-      // Don't auto-switch, show recovery UI
-    }
-  }, [permissionDenied]);
-
   const handleSendMessage = async (content: string, source: string = "text") => {
-    if (!content.trim() || sending || completing) return;
+    if (!content.trim() || sending || completingRef.current) return;
     setSending(true);
+    resetIdleTimers();
 
     addMessage({ role: "user", content, source: source as "voice" | "text" });
 
@@ -99,7 +140,6 @@ export default function ConversationStep({ sessionId }: Props) {
       const { data } = await flowApi.sendMessage(sessionId, content, source);
       addMessage({ role: "assistant", content: data.text, source: "text" });
 
-      // Make avatar speak
       if (isAvatarReady) {
         speakText(data.text);
       }
@@ -118,9 +158,15 @@ export default function ConversationStep({ sessionId }: Props) {
     }
   };
 
+  // Keep ref always pointing to latest handleSendMessage
+  handleSendRef.current = handleSendMessage;
+
   const handleComplete = async () => {
+    if (completingRef.current) return;
+    completingRef.current = true;
     setCompleting(true);
     stopRecording();
+    clearAllTimers();
 
     try {
       const { data } = await flowApi.completeSession(sessionId);
@@ -138,6 +184,7 @@ export default function ConversationStep({ sessionId }: Props) {
         content: "Something went wrong analyzing your feedback. Please try again.",
         source: "text",
       });
+      completingRef.current = false;
       setCompleting(false);
     }
   };
@@ -153,29 +200,25 @@ export default function ConversationStep({ sessionId }: Props) {
   if (permissionDenied && inputMode === "voice") {
     return (
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
-          <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+          <svg className="w-7 h-7 sm:w-8 sm:h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900">Microphone Access Needed</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900">Microphone Access Needed</h3>
         <p className="mt-2 text-gray-600 text-sm">
           To have a voice conversation, please allow microphone access in your browser settings.
         </p>
         <div className="mt-6 space-y-3 w-full max-w-xs">
           <button
-            onClick={() => {
-              startRecording();
-            }}
+            onClick={() => startRecording()}
             className="w-full py-3 px-4 rounded-lg font-medium text-white"
             style={{ backgroundColor: business?.branding.primary_color }}
           >
             Try Again
           </button>
           <button
-            onClick={() => {
-              setInputMode("text");
-            }}
+            onClick={() => setInputMode("text")}
             className="w-full py-3 px-4 rounded-lg font-medium text-gray-600 hover:bg-gray-100"
           >
             Type Instead
@@ -187,6 +230,13 @@ export default function ConversationStep({ sessionId }: Props) {
 
   return (
     <div className="flex-1 flex flex-col">
+      {/* Idle warning toast */}
+      {idleWarning && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-amber-500 text-white text-sm rounded-full shadow-lg animate-pulse">
+          Still there? Session will end soon if idle.
+        </div>
+      )}
+
       {/* Avatar video */}
       <div className="relative bg-gray-900 aspect-video max-h-[40vh]">
         <video
@@ -208,14 +258,14 @@ export default function ConversationStep({ sessionId }: Props) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-[200px]">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-3 min-h-[200px]">
         {messages.map((msg, i) => (
           <div
             key={i}
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${
+              className={`max-w-[80%] px-3 sm:px-4 py-2 rounded-2xl text-sm ${
                 msg.role === "user"
                   ? "bg-primary-600 text-white rounded-br-md"
                   : "bg-gray-100 text-gray-900 rounded-bl-md"
@@ -228,7 +278,7 @@ export default function ConversationStep({ sessionId }: Props) {
 
         {interimTranscript && (
           <div className="flex justify-end">
-            <div className="max-w-[80%] px-4 py-2 rounded-2xl text-sm bg-primary-200 text-primary-800 rounded-br-md opacity-70">
+            <div className="max-w-[80%] px-3 sm:px-4 py-2 rounded-2xl text-sm bg-primary-200 text-primary-800 rounded-br-md opacity-70">
               {interimTranscript}...
             </div>
           </div>
@@ -256,7 +306,7 @@ export default function ConversationStep({ sessionId }: Props) {
           <p className="mt-2 text-sm text-gray-500">Analyzing your feedback...</p>
         </div>
       ) : inputMode === "text" ? (
-        <form onSubmit={handleTextSubmit} className="px-4 py-3 border-t border-gray-200 flex gap-2">
+        <form onSubmit={handleTextSubmit} className="px-3 sm:px-4 py-3 border-t border-gray-200 flex gap-2">
           <input
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
@@ -276,7 +326,7 @@ export default function ConversationStep({ sessionId }: Props) {
           </button>
         </form>
       ) : (
-        <div className="px-4 py-4 flex items-center justify-center gap-4">
+        <div className="px-4 py-3 sm:py-4 flex items-center justify-center gap-4">
           <button
             onClick={() => {
               if (isRecording) {
@@ -285,16 +335,22 @@ export default function ConversationStep({ sessionId }: Props) {
                 startRecording();
               }
             }}
-            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
+            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all ${
               isRecording
                 ? "bg-red-500 animate-pulse"
                 : "bg-primary-600"
             } text-white shadow-lg`}
             style={!isRecording ? { backgroundColor: business?.branding.primary_color } : undefined}
           >
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-7 h-7 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
             </svg>
+          </button>
+          <button
+            onClick={() => setInputMode("text")}
+            className="px-3 py-2 bg-gray-100 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-200"
+          >
+            Type instead
           </button>
           {audioError && (
             <p className="text-xs text-red-500">{audioError}</p>

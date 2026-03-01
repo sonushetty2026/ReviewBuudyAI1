@@ -35,6 +35,10 @@ export default function SessionPage() {
   // Camera mode only applies to the conversation step
   const isCamera = presentationMode === "camera" && currentStep === "conversation";
 
+  // Fix #15: Keep the conversation component mounted behind the ReviewOverlay
+  // so the avatar stays visible instead of unmounting and killing the stream.
+  const showConversationBehind = currentStep === "review_confirm";
+
   const conversationComponent = isCamera ? (
     <CameraConversationStep sessionId={sessionId} onFallbackToFast={handleFallbackToFast} />
   ) : (
@@ -43,7 +47,6 @@ export default function SessionPage() {
 
   const stepComponents: Record<string, React.ReactNode> = {
     conversation: conversationComponent,
-    review_confirm: <ReviewConfirmStep sessionId={sessionId} />,
     consent: <ConsentStep sessionId={sessionId} />,
     google_review: <GoogleReviewStep sessionId={sessionId} />,
     return_check: <ReturnCheckStep sessionId={sessionId} />,
@@ -59,9 +62,9 @@ export default function SessionPage() {
       style={isCamera ? undefined : { backgroundColor: business.branding.secondary_color + "10" }}
     >
       {/* Header — hide in camera mode for immersive feel */}
-      {!isCamera && (
+      {!isCamera && !showConversationBehind && (
         <div
-          className="py-3 px-4 text-center text-white text-sm font-medium"
+          className="py-2 sm:py-3 px-4 text-center text-white text-xs sm:text-sm font-medium"
           style={{ backgroundColor: business.branding.primary_color }}
         >
           {business.name}
@@ -76,8 +79,22 @@ export default function SessionPage() {
       )}
 
       {/* Step content */}
-      <div className="flex-1 flex flex-col">
-        {stepComponents[currentStep] || <div>Unknown step</div>}
+      <div className="flex-1 flex flex-col relative">
+        {/* When on review_confirm, keep conversation visible behind a semi-transparent overlay */}
+        {showConversationBehind && (
+          <>
+            <div className="absolute inset-0 z-0">{conversationComponent}</div>
+            <div className="absolute inset-0 bg-black/40 z-10" />
+            <div className="relative z-20 flex-1 flex flex-col overflow-auto">
+              <ReviewConfirmStep sessionId={sessionId} />
+            </div>
+          </>
+        )}
+
+        {/* Normal step rendering (when NOT on review_confirm overlay) */}
+        {!showConversationBehind && (
+          stepComponents[currentStep] || <div>Unknown step</div>
+        )}
       </div>
     </div>
   );

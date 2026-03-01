@@ -1,10 +1,13 @@
 import json
+import logging
 import re
 from enum import Enum
 
 import anthropic
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationState(str, Enum):
@@ -85,12 +88,27 @@ async def get_conversation_response(
             "You MUST wrap up now. Thank the customer and set ready_to_complete to true."
         )
 
-    response = await client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=150,
-        system=system_prompt,
-        messages=messages,
-    )
+    try:
+        response = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=150,
+            system=system_prompt,
+            messages=messages,
+        )
+    except anthropic.RateLimitError:
+        logger.error("Anthropic rate limit hit during conversation")
+        return {
+            "text": "I'm having a moment — could you say that again?",
+            "state": "listening",
+            "ready_to_complete": False,
+        }
+    except Exception as e:
+        logger.error(f"Anthropic API error during conversation: {e}", exc_info=True)
+        return {
+            "text": "Sorry, I had a brief hiccup. Could you repeat that?",
+            "state": "listening",
+            "ready_to_complete": False,
+        }
 
     raw_text = response.content[0].text
 
@@ -99,7 +117,7 @@ async def get_conversation_response(
     if metadata_match:
         try:
             metadata = json.loads(metadata_match.group(1))
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError):
             pass
 
     display_text = re.sub(r'\s*<metadata>.*?</metadata>\s*', '', raw_text, flags=re.DOTALL).strip()
@@ -118,13 +136,14 @@ async def analyze_sentiment_and_extract(
     settings = get_settings()
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
-    response = await client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=500,
-        messages=[
-            {
-                "role": "user",
-                "content": f"""Analyze this customer feedback conversation at {business_name} and return a JSON object with these fields:
+    try:
+        response = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=500,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""Analyze this customer feedback conversation at {business_name} and return a JSON object with these fields:
 
 - sentiment_label: "positive", "negative", or "neutral"
 - sentiment_score: float from -1.0 (very negative) to 1.0 (very positive)
@@ -136,14 +155,27 @@ Conversation:
 {conversation_text}
 
 Return ONLY valid JSON, no other text.""",
-            }
-        ],
-    )
+                }
+            ],
+        )
+    except Exception as e:
+        logger.error(f"Anthropic API error during sentiment analysis: {e}", exc_info=True)
+        return {
+            "sentiment_label": "neutral",
+            "sentiment_score": 0.0,
+            "star_rating": 3,
+            "key_topics": [],
+            "summary": "Customer submitted feedback (analysis unavailable).",
+        }
 
     raw = response.content[0].text.strip()
-    json_match = re.search(r'\{.*\}', raw, re.DOTALL)
-    if json_match:
-        return json.loads(json_match.group())
+
+    try:
+        json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group())
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.error(f"Failed to parse sentiment JSON: {e}. Raw response: {raw[:200]}")
 
     return {
         "sentiment_label": "neutral",

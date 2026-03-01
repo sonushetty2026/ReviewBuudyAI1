@@ -31,7 +31,7 @@ export default function WelcomePage() {
       });
   }, [slug]);
 
-  const startSession = async (presentationMode: PresentationMode) => {
+  const startSession = async (presentationMode: PresentationMode, inputMode: "voice" | "text" = "voice") => {
     if (!slug || starting) return;
     setStarting(true);
     setStartingMode(presentationMode);
@@ -39,7 +39,6 @@ export default function WelcomePage() {
 
     try {
       const fp = await getFingerprint();
-      const inputMode = "voice";
       setInputMode(inputMode);
       setPresentationMode(presentationMode);
       const { data } = await flowApi.startSession(
@@ -98,7 +97,7 @@ export default function WelcomePage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-6"
+      className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6"
       style={{ backgroundColor: branding.secondary_color + "10" }}
     >
       <div className="w-full max-w-md text-center">
@@ -106,25 +105,25 @@ export default function WelcomePage() {
           <img
             src={branding.logo_url}
             alt={business.name}
-            className="w-20 h-20 mx-auto mb-4 rounded-full object-cover"
+            className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full object-cover"
           />
         )}
 
         <h1
-          className="text-3xl font-bold"
+          className="text-2xl sm:text-3xl font-bold"
           style={{ color: branding.primary_color }}
         >
           {business.name}
         </h1>
 
-        <p className="mt-4 text-lg text-gray-700">{branding.welcome_message}</p>
+        <p className="mt-3 sm:mt-4 text-base sm:text-lg text-gray-700">{branding.welcome_message}</p>
 
-        <div className="mt-8 space-y-3">
+        <div className="mt-6 sm:mt-8 space-y-3">
           {/* Primary CTA: Fast mode (FaceTime-style) */}
           <button
             onClick={() => startSession("fast")}
             disabled={starting}
-            className="w-full py-4 px-6 rounded-xl text-white font-semibold text-lg shadow-lg transition-all hover:shadow-xl disabled:opacity-50"
+            className="w-full py-3 sm:py-4 px-6 rounded-xl text-white font-semibold text-base sm:text-lg shadow-lg transition-all hover:shadow-xl disabled:opacity-50"
             style={{ backgroundColor: branding.primary_color }}
           >
             {starting && startingMode === "fast" ? (
@@ -134,7 +133,7 @@ export default function WelcomePage() {
               </span>
             ) : (
               <span className="flex items-center justify-center gap-2">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 Start (Fast)
@@ -146,7 +145,7 @@ export default function WelcomePage() {
           <button
             onClick={() => startSession("camera")}
             disabled={starting}
-            className="w-full py-3 px-6 rounded-xl font-medium border-2 transition-all hover:shadow-md disabled:opacity-50"
+            className="w-full py-2.5 sm:py-3 px-6 rounded-xl font-medium border-2 transition-all hover:shadow-md disabled:opacity-50"
             style={{
               borderColor: branding.primary_color,
               color: branding.primary_color,
@@ -169,8 +168,22 @@ export default function WelcomePage() {
           </button>
 
           <p className="text-xs text-gray-400 mt-1">
-            Camera mode uses your rear camera as a background for a wow effect
+            Camera mode shows you on-screen — like a FaceTime call with the avatar
           </p>
+
+          {/* Text-only fallback — for accessibility / locked mic / noisy environments */}
+          <button
+            onClick={() => startSession("fast", "text")}
+            disabled={starting}
+            className="w-full py-2 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Type instead (no mic needed)
+            </span>
+          </button>
         </div>
 
         {error && (
@@ -179,7 +192,7 @@ export default function WelcomePage() {
           </div>
         )}
 
-        <p className="mt-8 text-xs text-gray-400">
+        <p className="mt-6 sm:mt-8 text-xs text-gray-400">
           Powered by Scan & Speak
         </p>
       </div>
