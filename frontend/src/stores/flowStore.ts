@@ -5,6 +5,7 @@ import type {
   CompleteResponse,
   RewardResponse,
   ConversationStep,
+  PresentationMode,
 } from "../types/flow";
 
 interface ChatMessage {
@@ -24,6 +25,7 @@ interface FlowState {
   googleReviewUrl: string | null;
   reward: RewardResponse | null;
   inputMode: "voice" | "text";
+  presentationMode: PresentationMode;
 
   setBusiness: (business: FlowBusiness) => void;
   setSession: (session: Session) => void;
@@ -35,6 +37,7 @@ interface FlowState {
   setGoogleReviewUrl: (url: string | null) => void;
   setReward: (reward: RewardResponse) => void;
   setInputMode: (mode: "voice" | "text") => void;
+  setPresentationMode: (mode: PresentationMode) => void;
   reset: () => void;
 }
 
@@ -49,6 +52,7 @@ const initialState = {
   googleReviewUrl: null,
   reward: null,
   inputMode: "voice" as "voice" | "text",
+  presentationMode: "fast" as PresentationMode,
 };
 
 export const useFlowStore = create<FlowState>((set) => ({
@@ -64,5 +68,6 @@ export const useFlowStore = create<FlowState>((set) => ({
   setGoogleReviewUrl: (googleReviewUrl) => set({ googleReviewUrl }),
   setReward: (reward) => set({ reward }),
   setInputMode: (inputMode) => set({ inputMode }),
+  setPresentationMode: (presentationMode) => set({ presentationMode }),
   reset: () => set(initialState),
 }));

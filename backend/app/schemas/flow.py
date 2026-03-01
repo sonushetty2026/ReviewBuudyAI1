@@ -10,6 +10,7 @@ class StartSessionRequest(BaseModel):
     visitor_id: str
     request_id: str = ""
     input_mode: str = "voice"  # "voice" or "text"
+    presentation_mode: str = "fast"  # "fast" or "camera"
 
 
 class SendMessageRequest(BaseModel):

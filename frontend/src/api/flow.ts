@@ -20,11 +20,12 @@ export const flowApi = {
   getBusiness: (slug: string) =>
     flowClient.get<FlowBusiness>(`/flow/${slug}`),
 
-  startSession: (slug: string, visitorId: string, requestId: string, inputMode: string = "voice") =>
+  startSession: (slug: string, visitorId: string, requestId: string, inputMode: string = "voice", presentationMode: string = "fast") =>
     flowClient.post<Session>(`/flow/${slug}/start`, {
       visitor_id: visitorId,
       request_id: requestId,
       input_mode: inputMode,
+      presentation_mode: presentationMode,
     }),
 
   sendMessage: (sessionId: string, content: string, source: string = "text") =>

@@ -25,6 +25,7 @@ class FeedbackSession(UUIDMixin, TimestampMixin, Base):
     customer_name: Mapped[str | None] = mapped_column(String(255))
     customer_phone: Mapped[str | None] = mapped_column(String(20))
     customer_email: Mapped[str | None] = mapped_column(String(255))
+    presentation_mode: Mapped[str | None] = mapped_column(String(10), default="fast")  # 'fast' or 'camera'
     device_fingerprint: Mapped[str | None] = mapped_column(String(255))
     ip_address: Mapped[str | None] = mapped_column(String(45))
     device_info: Mapped[dict | None] = mapped_column(JSONB)
