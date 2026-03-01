@@ -78,6 +78,33 @@ async def _get_session(session_id: uuid.UUID, db: AsyncSession) -> FeedbackSessi
 @router.get("/heygen-token")
 async def get_heygen_token():
     settings = get_settings()
+
+    # Prefer LiveAvatar API (new platform)
+    if settings.liveavatar_api_key:
+        avatar_id = "Wayne_20240711"
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.liveavatar.com/v1/sessions/token",
+                headers={
+                    "X-API-KEY": settings.liveavatar_api_key,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "avatar_id": avatar_id,
+                    "mode": "FULL",
+                    "avatar_persona": {"language": "en"},
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        return {
+            "token": data.get("session_token", ""),
+            "session_id": data.get("session_id", ""),
+            "provider": "liveavatar",
+        }
+
+    # Fallback: legacy HeyGen streaming token
     if not settings.heygen_api_key:
         raise NotFound("HeyGen API key not configured")
 
@@ -89,7 +116,10 @@ async def get_heygen_token():
         resp.raise_for_status()
         data = resp.json()
 
-    return {"token": data.get("data", {}).get("token", data.get("token", ""))}
+    return {
+        "token": data.get("data", {}).get("token", data.get("token", "")),
+        "provider": "heygen",
+    }
 
 
 @router.get("/{slug}", response_model=FlowBusinessResponse)

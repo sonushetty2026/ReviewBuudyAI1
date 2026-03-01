@@ -1,94 +1,110 @@
 import { useCallback, useRef, useState } from "react";
-import StreamingAvatar, {
-  AvatarQuality,
-  StreamingEvents,
-  TaskType,
-} from "@heygen/streaming-avatar";
+import {
+  LiveAvatarSession,
+  SessionEvent,
+  AgentEventsEnum,
+} from "@heygen/liveavatar-web-sdk";
 
-// TODO: Migrate to @heygen/liveavatar-web-sdk once HeyGen completes the
-// Interactive Avatar → LiveAvatar transition. The new SDK uses a LiveKit-based
-// architecture with server-side session management. See:
-// https://docs.liveavatar.com/docs/quick-start-guide
-
-// Default avatar ID — "default" is NOT a valid HeyGen avatar ID and causes
-// STREAM_READY to never fire.  Use a real avatar from the HeyGen dashboard.
-// Override via the VITE_HEYGEN_AVATAR_ID env var.
+// Default avatar ID — override via VITE_HEYGEN_AVATAR_ID env var.
 const DEFAULT_AVATAR_ID = import.meta.env.VITE_HEYGEN_AVATAR_ID || "Wayne_20240711";
 
-// How long to wait for STREAM_READY before giving up (ms)
+// How long to wait for SESSION_STREAM_READY before giving up (ms)
 const AVATAR_TIMEOUT_MS = 15_000;
 
-async function fetchAccessToken(): Promise<string> {
+interface TokenResponse {
+  token: string;
+  session_id?: string;
+  provider?: string;
+}
+
+async function fetchSessionToken(): Promise<TokenResponse> {
   const res = await fetch("/api/v1/flow/heygen-token");
-  const data = await res.json();
-  return data.token;
+  if (!res.ok) throw new Error("Failed to fetch avatar token");
+  return res.json();
 }
 
 export function useHeyGenAvatar() {
-  const avatarRef = useRef<StreamingAvatar | null>(null);
+  const sessionRef = useRef<LiveAvatarSession | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const avatarTimedOutRef = useRef(false);
+  const generationRef = useRef(0); // React StrictMode guard
   const [isAvatarReady, setIsAvatarReady] = useState(false);
   const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false);
   const [avatarTimedOut, setAvatarTimedOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const startAvatar = useCallback(async (avatarId?: string) => {
+    const generation = ++generationRef.current;
+
     try {
       setError(null);
       setAvatarTimedOut(false);
       avatarTimedOutRef.current = false;
 
-      let token: string;
+      let tokenData: TokenResponse;
       try {
-        token = await fetchAccessToken();
+        tokenData = await fetchSessionToken();
       } catch {
-        setError("HeyGen API key not configured. Avatar will not be displayed.");
+        setError("Avatar API key not configured. Avatar will not be displayed.");
         return;
       }
 
-      const avatar = new StreamingAvatar({ token });
-      avatarRef.current = avatar;
+      // StrictMode double-mount guard
+      if (generation !== generationRef.current) return;
 
-      avatar.on(StreamingEvents.STREAM_READY, (event: any) => {
+      const session = new LiveAvatarSession(tokenData.token, {
+        voiceChat: false,
+      });
+      sessionRef.current = session;
+
+      // Listen for stream ready
+      session.on(SessionEvent.SESSION_STREAM_READY, () => {
+        if (generation !== generationRef.current) return;
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
         }
-        if (videoRef.current && event.detail) {
-          videoRef.current.srcObject = event.detail;
-          videoRef.current.play().catch(() => {});
+
+        // Attach the avatar video stream to our video element
+        if (videoRef.current) {
+          const mediaStream = (session as any).mediaStream;
+          if (mediaStream) {
+            videoRef.current.srcObject = mediaStream;
+            videoRef.current.play().catch(() => {});
+          }
         }
+
         setIsAvatarReady(true);
       });
 
-      avatar.on(StreamingEvents.AVATAR_START_TALKING, () => {
-        setIsAvatarSpeaking(true);
-      });
-
-      avatar.on(StreamingEvents.AVATAR_STOP_TALKING, () => {
-        setIsAvatarSpeaking(false);
-      });
-
-      avatar.on(StreamingEvents.STREAM_DISCONNECTED, () => {
+      session.on(SessionEvent.SESSION_DISCONNECTED, () => {
+        if (generation !== generationRef.current) return;
         setIsAvatarReady(false);
       });
 
-      // Timeout: if STREAM_READY never fires, let the UI proceed without the avatar
+      // Agent-level events for speaking state
+      session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => {
+        if (generation !== generationRef.current) return;
+        setIsAvatarSpeaking(true);
+      });
+
+      session.on(AgentEventsEnum.AVATAR_SPEAK_ENDED, () => {
+        if (generation !== generationRef.current) return;
+        setIsAvatarSpeaking(false);
+      });
+
+      // Timeout: if stream never becomes ready, let UI proceed
       timeoutRef.current = setTimeout(() => {
-        if (!avatarRef.current) return;
+        if (generation !== generationRef.current) return;
         avatarTimedOutRef.current = true;
         setAvatarTimedOut(true);
         setError("Avatar took too long to load. Voice mode is still active.");
       }, AVATAR_TIMEOUT_MS);
 
-      await avatar.createStartAvatar({
-        quality: AvatarQuality.Medium,
-        avatarName: avatarId || DEFAULT_AVATAR_ID,
-        language: "en",
-      });
+      await session.start();
     } catch (err: any) {
+      if (generation !== generationRef.current) return;
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -98,29 +114,27 @@ export function useHeyGenAvatar() {
   }, []);
 
   const speakText = useCallback(async (text: string) => {
-    if (!avatarRef.current || avatarTimedOutRef.current) return;
+    if (!sessionRef.current || avatarTimedOutRef.current) return;
     try {
-      await avatarRef.current.speak({
-        text,
-        taskType: TaskType.REPEAT,
-      });
+      await (sessionRef.current as any).repeat(text);
     } catch (err: any) {
       console.error("Avatar speak error:", err);
     }
   }, []);
 
   const stopAvatar = useCallback(async () => {
+    generationRef.current++; // invalidate any in-flight init
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    if (avatarRef.current) {
+    if (sessionRef.current) {
       try {
-        await avatarRef.current.stopAvatar();
+        await sessionRef.current.stop();
       } catch {
         // ignore cleanup errors
       }
-      avatarRef.current = null;
+      sessionRef.current = null;
     }
     setIsAvatarReady(false);
     setIsAvatarSpeaking(false);

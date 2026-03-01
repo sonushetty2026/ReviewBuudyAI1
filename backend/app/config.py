@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = "JBFqnCBsd6RMkjVDRZzb"
 
-    # HeyGen
+    # HeyGen / LiveAvatar
     heygen_api_key: str = ""
+    liveavatar_api_key: str = ""
 
     # Deepgram
     deepgram_api_key: str = ""

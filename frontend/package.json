@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@fingerprintjs/fingerprintjs-pro": "^3.12.7",
-    "@heygen/streaming-avatar": "^2.1.0",
+    "@heygen/liveavatar-web-sdk": "^0.0.10",
     "axios": "^1.7.0",
     "date-fns": "^4.1.0",
     "react": "^19.0.0",
@@ -25,6 +25,7 @@
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",

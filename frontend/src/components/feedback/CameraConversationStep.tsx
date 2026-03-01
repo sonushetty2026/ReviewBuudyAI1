@@ -242,7 +242,7 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
         playsInline
         muted
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ zIndex: 0, transform: "scaleX(-1)" }}
+        style={{ zIndex: 0 }}
       />
 
       {/* Dark overlay for readability */}
@@ -257,7 +257,7 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
 
       {/* Layer 2: Avatar overlay — PiP bubble bottom-right */}
       <div
-        className="absolute bottom-28 right-3 w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/30"
+        className="absolute bottom-28 right-3 w-44 h-44 sm:w-56 sm:h-56 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/30"
         style={{ zIndex: 10 }}
       >
         <video
@@ -298,10 +298,10 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
           <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 20 }}>
             <div className="bg-black/70 backdrop-blur-sm rounded-2xl p-6 mx-6 max-w-sm text-center">
               <p className="text-white text-base font-medium">
-                You're on camera — like a video call!
+                AR Mode — your space is the backdrop!
               </p>
               <p className="text-white/70 text-sm mt-2">
-                Hold your phone at eye level. Good lighting helps.
+                Hold phone at chest or eye height. Not seeing the room? Tilt up.
               </p>
               <button
                 onClick={() => setShowGuidance(false)}
