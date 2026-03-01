@@ -18,17 +18,25 @@ export function useFingerprint() {
       };
     }
 
-    if (!fpRef.current) {
-      fpRef.current = await FingerprintJS.load({
-        apiKey: FINGERPRINT_API_KEY,
-      });
-    }
+    try {
+      if (!fpRef.current) {
+        fpRef.current = await FingerprintJS.load({
+          apiKey: FINGERPRINT_API_KEY,
+        });
+      }
 
-    const result = await fpRef.current.get();
-    return {
-      visitorId: result.visitorId,
-      requestId: result.requestId,
-    };
+      const result = await fpRef.current.get();
+      return {
+        visitorId: result.visitorId,
+        requestId: result.requestId,
+      };
+    } catch {
+      // Fallback if FingerprintJS Pro fails (expired key, network issue, etc.)
+      return {
+        visitorId: `fallback-${Math.random().toString(36).substring(2, 10)}`,
+        requestId: "",
+      };
+    }
   }, []);
 
   return { getFingerprint };

@@ -42,6 +42,10 @@ export default function WelcomePage() {
     } catch (err: any) {
       if (err.response?.status === 429) {
         setError("You've reached the session limit. Please try again later.");
+      } else if (err.response?.status === 500) {
+        setError("Server error. Please check the backend is running correctly.");
+      } else if (!err.response) {
+        setError("Cannot reach the server. Please check the backend is running.");
       } else {
         setError("Failed to start session. Please try again.");
       }
