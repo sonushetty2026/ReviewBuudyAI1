@@ -297,9 +297,9 @@ async def complete_session(
         )
     except Exception as e:
         logger.error(f"Sentiment analysis failed: {e}", exc_info=True)
-        # Fallback: treat as negative so a complaint is created and the flow completes
+        # Fallback: neutral so the flow completes without creating a spurious complaint
         analysis = {
-            "sentiment_label": "negative",
+            "sentiment_label": "neutral",
             "sentiment_score": 0,
             "star_rating": 3,
             "key_topics": [],
@@ -315,7 +315,7 @@ async def complete_session(
     session.original_text = conversation_text
     session.completed_at = datetime.now(timezone.utc)
 
-    flow = "positive"
+    flow = "neutral"
     rewritten = None
 
     if analysis["sentiment_label"] == "positive" and analysis["star_rating"] >= 4:
@@ -331,8 +331,9 @@ async def complete_session(
             logger.error(f"Review rewrite failed: {e}", exc_info=True)
             # Fallback: use the raw conversation text trimmed to a reasonable length
             rewritten = conversation_text[:500].strip()
+        flow = "positive"
         session.rewritten_review = rewritten
-    else:
+    elif analysis["sentiment_label"] == "negative":
         # Negative flow: create complaint
         flow = "negative"
         priority = "medium"

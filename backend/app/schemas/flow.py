@@ -84,7 +84,7 @@ class CompleteResponse(BaseModel):
     star_rating: int
     summary: str
     rewritten_review: str | None = None
-    flow: str  # "positive" or "negative"
+    flow: str  # "positive" | "negative" | "neutral"
 
 
 class ReviewConfirmResponse(BaseModel):
