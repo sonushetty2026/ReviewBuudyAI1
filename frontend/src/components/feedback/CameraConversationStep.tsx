@@ -5,6 +5,11 @@ import { useHeyGenAvatar } from "../../hooks/useHeyGenAvatar";
 import { useAudioRecorder } from "../../hooks/useAudioRecorder";
 import { useCamera } from "../../hooks/useCamera";
 
+// Session protection constants
+const MAX_SESSION_MS = 5 * 60 * 1000;
+const IDLE_WARNING_MS = 90 * 1000;
+const IDLE_KILL_MS = 2 * 60 * 1000;
+
 interface Props {
   sessionId: string;
   onFallbackToFast: () => void;
@@ -29,7 +34,13 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
   const [interimTranscript, setInterimTranscript] = useState("");
   const [showGuidance, setShowGuidance] = useState(true);
   const [cameraReady, setCameraReady] = useState(false);
+  const [idleWarning, setIdleWarning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const greetingAddedRef = useRef(false);
+  const completingRef = useRef(false);
+
+  // Ref for stale-closure-safe access to latest handler
+  const handleSendRef = useRef<((content: string, source?: string) => Promise<void>) | null>(null);
 
   const { cameraVideoRef, isCameraActive, startCamera, stopCamera } = useCamera();
 
@@ -40,16 +51,43 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
     (text: string, isFinal: boolean) => {
       if (isFinal) {
         setInterimTranscript("");
-        handleSendMessage(text, "voice");
+        handleSendRef.current?.(text, "voice");
       } else {
         setInterimTranscript(text);
       }
     },
-    [sessionId]
+    []
   );
 
   const { isRecording, startRecording, stopRecording, permissionDenied, error: audioError } =
     useAudioRecorder({ sessionId, onTranscript });
+
+  // --- Session timeout protection ---
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleKillRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearAllTimers = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (idleKillRef.current) clearTimeout(idleKillRef.current);
+    if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
+  }, []);
+
+  const resetIdleTimers = useCallback(() => {
+    setIdleWarning(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (idleKillRef.current) clearTimeout(idleKillRef.current);
+
+    idleTimerRef.current = setTimeout(() => {
+      setIdleWarning(true);
+    }, IDLE_WARNING_MS);
+
+    idleKillRef.current = setTimeout(() => {
+      if (!completingRef.current) {
+        handleComplete();
+      }
+    }, IDLE_KILL_MS);
+  }, []);
 
   // Start camera and avatar on mount
   useEffect(() => {
@@ -60,7 +98,6 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
       if (!mounted) return;
 
       if (!cameraOk) {
-        // Camera failed — fallback to fast mode
         onFallbackToFast();
         return;
       }
@@ -70,11 +107,20 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
 
     init();
 
+    // 5-minute hard cap
+    sessionTimerRef.current = setTimeout(() => {
+      if (!completingRef.current) {
+        handleComplete();
+      }
+    }, MAX_SESSION_MS);
+    resetIdleTimers();
+
     return () => {
       mounted = false;
       stopCamera();
       stopAvatar();
       stopRecording();
+      clearAllTimers();
     };
   }, []);
 
@@ -85,14 +131,15 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
     }
   }, [isAvatarReady, session?.greeting]);
 
-  // Add greeting to messages on mount
+  // Add greeting — guarded against StrictMode double-fire
   useEffect(() => {
-    if (session?.greeting && messages.length === 0) {
+    if (session?.greeting && messages.length === 0 && !greetingAddedRef.current) {
+      greetingAddedRef.current = true;
       addMessage({ role: "assistant", content: session.greeting, source: "text" });
     }
   }, [session?.greeting]);
 
-  // Start recording when avatar is ready OR when avatar has failed (don't block voice on HeyGen)
+  // Start recording when avatar is ready OR when avatar has failed
   useEffect(() => {
     if (inputMode === "voice" && !isRecording && !permissionDenied) {
       if (isAvatarReady || avatarError) {
@@ -122,8 +169,9 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
   }, [showGuidance, cameraReady]);
 
   const handleSendMessage = async (content: string, source: string = "text") => {
-    if (!content.trim() || sending || completing) return;
+    if (!content.trim() || sending || completingRef.current) return;
     setSending(true);
+    resetIdleTimers();
 
     addMessage({ role: "user", content, source: source as "voice" | "text" });
 
@@ -149,10 +197,17 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
     }
   };
 
+  // Keep ref always pointing to latest handleSendMessage
+  handleSendRef.current = handleSendMessage;
+
   const handleComplete = async () => {
+    if (completingRef.current) return;
+    completingRef.current = true;
     setCompleting(true);
     stopRecording();
     stopCamera();
+    stopAvatar(); // Fix #16: stop avatar to stop burning HeyGen credits
+    clearAllTimers();
 
     try {
       const { data } = await flowApi.completeSession(sessionId);
@@ -165,6 +220,7 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
         setCurrentStep("empathy");
       }
     } catch {
+      completingRef.current = false;
       setCompleting(false);
     }
   };
@@ -186,15 +242,22 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
         playsInline
         muted
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ zIndex: 0 }}
+        style={{ zIndex: 0, transform: "scaleX(-1)" }}
       />
 
       {/* Dark overlay for readability */}
       <div className="absolute inset-0 bg-black/20" style={{ zIndex: 1 }} />
 
+      {/* Idle warning */}
+      {idleWarning && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-amber-500 text-white text-sm rounded-full shadow-lg animate-pulse">
+          Still there? Session will end soon if idle.
+        </div>
+      )}
+
       {/* Layer 2: Avatar overlay — PiP bubble bottom-right */}
       <div
-        className="absolute bottom-28 right-3 w-32 h-32 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/30"
+        className="absolute bottom-28 right-3 w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/30"
         style={{ zIndex: 10 }}
       >
         <video
@@ -235,10 +298,10 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
           <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 20 }}>
             <div className="bg-black/70 backdrop-blur-sm rounded-2xl p-6 mx-6 max-w-sm text-center">
               <p className="text-white text-base font-medium">
-                For best effect, hold your phone at chest or eye level.
+                You're on camera — like a video call!
               </p>
               <p className="text-white/70 text-sm mt-2">
-                Good lighting helps.
+                Hold your phone at eye level. Good lighting helps.
               </p>
               <button
                 onClick={() => setShowGuidance(false)}
@@ -322,7 +385,7 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
             </button>
           </form>
         ) : (
-          <div className="px-4 py-4 flex flex-col items-center gap-2">
+          <div className="px-4 py-3 sm:py-4 flex flex-col items-center gap-2">
             <div className="flex items-center justify-center gap-4">
               <button
                 onClick={() => {
@@ -332,14 +395,14 @@ export default function CameraConversationStep({ sessionId, onFallbackToFast }: 
                     startRecording();
                   }
                 }}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-lg ${
+                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all shadow-lg ${
                   isRecording
                     ? "bg-red-500 animate-pulse"
                     : "bg-white/90"
                 }`}
               >
                 <svg
-                  className={`w-8 h-8 ${isRecording ? "text-white" : ""}`}
+                  className={`w-7 h-7 sm:w-8 sm:h-8 ${isRecording ? "text-white" : ""}`}
                   style={!isRecording ? { color: business?.branding.primary_color } : undefined}
                   fill="none"
                   stroke="currentColor"

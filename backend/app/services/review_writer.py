@@ -1,8 +1,11 @@
+import logging
 import re
 
 import anthropic
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 async def rewrite_review(
@@ -16,13 +19,14 @@ async def rewrite_review(
 
     topics_str = ", ".join(key_topics) if key_topics else "their overall experience"
 
-    response = await client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=300,
-        messages=[
-            {
-                "role": "user",
-                "content": f"""Write a Google review for {business_name} based on this customer feedback conversation.
+    try:
+        response = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=300,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""Write a Google review for {business_name} based on this customer feedback conversation.
 
 Requirements:
 - First-person perspective (as if the customer wrote it)
@@ -37,9 +41,12 @@ Conversation:
 {conversation_text}
 
 Write ONLY the review text, nothing else.""",
-            }
-        ],
-    )
+                }
+            ],
+        )
+    except Exception as e:
+        logger.error(f"Anthropic API error during review rewrite: {e}", exc_info=True)
+        raise
 
     review = response.content[0].text.strip()
     review = re.sub(r'^["\']|["\']$', '', review)

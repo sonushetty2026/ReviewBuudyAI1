@@ -236,13 +236,21 @@ async def send_message(
     # Count customer messages
     customer_count = sum(1 for m in messages if m["role"] == "user")
 
-    response = await ai_conversation.get_conversation_response(
-        messages=messages,
-        business_name=business.name,
-        avatar_style=branding.avatar_style if branding else "friendly",
-        welcome_message=branding.welcome_message if branding else "",
-        message_count=customer_count,
-    )
+    try:
+        response = await ai_conversation.get_conversation_response(
+            messages=messages,
+            business_name=business.name,
+            avatar_style=branding.avatar_style if branding else "friendly",
+            welcome_message=branding.welcome_message if branding else "",
+            message_count=customer_count,
+        )
+    except Exception as e:
+        logger.error(f"AI conversation response failed: {e}", exc_info=True)
+        response = {
+            "text": "I had a brief hiccup — could you say that one more time?",
+            "state": "listening",
+            "ready_to_complete": False,
+        }
 
     # Store assistant response
     assistant_msg = ConversationMessage(

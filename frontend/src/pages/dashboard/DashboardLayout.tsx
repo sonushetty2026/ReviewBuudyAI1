@@ -19,7 +19,7 @@ const pageTitles: Record<string, string> = {
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, setUser, loadFromStorage } = useAuthStore();
+  const { user, setUser, loadFromStorage, logout } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -46,6 +46,11 @@ export default function DashboardLayout() {
     init();
   }, []);
 
+  const handleSignOut = () => {
+    logout();
+    navigate("/login");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -70,11 +75,24 @@ export default function DashboardLayout() {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="p-6 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-primary-600">Scan & Speak</h1>
-          {user && (
-            <p className="text-sm text-gray-500 mt-1 truncate">{user.full_name}</p>
-          )}
+        {/* Sidebar header with close button on mobile */}
+        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-primary-600">Scan & Speak</h1>
+            {user && (
+              <p className="text-sm text-gray-500 mt-1 truncate">{user.full_name}</p>
+            )}
+          </div>
+          {/* Close button — mobile only */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            aria-label="Close menu"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
@@ -98,12 +116,25 @@ export default function DashboardLayout() {
             );
           })}
         </nav>
+
+        {/* Sign out — visible in mobile sidebar */}
+        <div className="p-4 border-t border-gray-200 md:hidden">
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Sign Out
+          </button>
+        </div>
       </aside>
 
       {/* Main area: header + content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top header bar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 shrink-0">
+        <header className="h-14 sm:h-16 bg-white border-b border-gray-200 flex items-center justify-between px-3 sm:px-4 md:px-8 shrink-0">
           <div className="flex items-center gap-3">
             {/* Hamburger button — mobile only */}
             <button
@@ -115,7 +146,7 @@ export default function DashboardLayout() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h1 className="text-lg font-semibold text-gray-900">
+            <h1 className="text-base sm:text-lg font-semibold text-gray-900">
               {pageTitles[location.pathname] || "Dashboard"}
             </h1>
           </div>
@@ -135,7 +166,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 md:p-8 overflow-auto">
+        <main className="flex-1 p-3 sm:p-4 md:p-8 overflow-auto">
           <Outlet />
         </main>
       </div>

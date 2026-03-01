@@ -22,7 +22,11 @@ export function useAudioRecorder({ sessionId, onTranscript }: UseAudioRecorderOp
       // Guard: getUserMedia requires HTTPS on mobile browsers
       if (!navigator.mediaDevices?.getUserMedia) {
         setPermissionDenied(true);
-        setError("Microphone not supported. Please use HTTPS or type instead.");
+        setError(
+          window.location.protocol === "https:"
+            ? "Microphone not available on this device"
+            : "Microphone requires HTTPS connection"
+        );
         return;
       }
 
@@ -68,7 +72,9 @@ export function useAudioRecorder({ sessionId, onTranscript }: UseAudioRecorderOp
       };
 
       ws.onerror = () => {
-        setError("Audio connection error");
+        setError("Audio connection error. Switching to text input.");
+        // On WebSocket failure, trigger text fallback by signaling permission denied
+        setPermissionDenied(true);
       };
 
       ws.onclose = () => {
