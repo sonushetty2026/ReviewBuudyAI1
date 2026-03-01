@@ -15,14 +15,14 @@ export default function ContactCollectionStep({ sessionId }: Props) {
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    const contact: Record<string, string> = {};
+    if (name.trim()) contact.name = name.trim();
+    if (phone.trim()) contact.phone = phone.trim();
+    if (email.trim()) contact.email = email.trim();
     try {
-      await flowApi.submitContact(sessionId, {
-        name: name || undefined,
-        phone: phone || undefined,
-        email: email || undefined,
-      });
+      await flowApi.submitContact(sessionId, contact);
     } catch {
-      // Continue even if save fails
+      // Continue to reward even if save fails
     }
     setCurrentStep("reward");
   };

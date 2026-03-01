@@ -88,7 +88,7 @@ export default function ConversationStep({ sessionId }: Props) {
   }, [permissionDenied]);
 
   const handleSendMessage = async (content: string, source: string = "text") => {
-    if (!content.trim() || sending) return;
+    if (!content.trim() || sending || completing) return;
     setSending(true);
 
     addMessage({ role: "user", content, source: source as "voice" | "text" });
@@ -131,6 +131,11 @@ export default function ConversationStep({ sessionId }: Props) {
         setCurrentStep("empathy");
       }
     } catch {
+      addMessage({
+        role: "assistant",
+        content: "Something went wrong analyzing your feedback. Please try again.",
+        source: "text",
+      });
       setCompleting(false);
     }
   };

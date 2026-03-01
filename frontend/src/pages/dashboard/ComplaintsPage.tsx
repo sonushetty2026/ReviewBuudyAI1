@@ -32,6 +32,7 @@ export default function ComplaintsPage() {
   const [saving, setSaving] = useState(false);
 
   const loadComplaints = async () => {
+    setLoading(true);
     try {
       const params: Record<string, string> = {};
       if (filterStatus) params.status = filterStatus;

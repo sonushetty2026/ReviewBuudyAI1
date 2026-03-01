@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { flowApi } from "../../api/flow";
 import { useFlowStore } from "../../stores/flowStore";
 
@@ -16,6 +17,7 @@ export default function ReviewConfirmStep({ sessionId }: Props) {
       await flowApi.confirmReview(sessionId, reviewText);
       setCurrentStep("consent");
     } catch {
+      toast.error("Failed to save your review. Please try again.");
       setSaving(false);
     }
   };

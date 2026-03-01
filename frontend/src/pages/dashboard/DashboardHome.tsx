@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   dashboardApi,
   type Business,
@@ -11,12 +12,13 @@ export default function DashboardHome() {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [qrError, setQrError] = useState(false);
 
   useEffect(() => {
-    dashboardApi.getBusiness().then(({ data }) => setBusiness(data));
-    dashboardApi.getBranding().then(({ data }) => setBranding(data));
-    dashboardApi.getStats().then(({ data }) => setStats(data));
-    dashboardApi.getQrCode().then(setQrUrl).catch(() => {});
+    dashboardApi.getBusiness().then(({ data }) => setBusiness(data)).catch(() => toast.error("Failed to load business info"));
+    dashboardApi.getBranding().then(({ data }) => setBranding(data)).catch(() => {});
+    dashboardApi.getStats().then(({ data }) => setStats(data)).catch(() => toast.error("Failed to load stats"));
+    dashboardApi.getQrCode().then(setQrUrl).catch(() => setQrError(true));
   }, []);
 
   const brandingConfigured =
@@ -80,7 +82,14 @@ export default function DashboardHome() {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             Your QR Code
           </h3>
-          {qrUrl ? (
+          {qrError ? (
+            <div className="flex items-center justify-center h-48 text-center">
+              <div>
+                <p className="text-gray-500 text-sm">Could not load QR code.</p>
+                <p className="text-gray-400 text-xs mt-1">Check your backend connection.</p>
+              </div>
+            </div>
+          ) : qrUrl ? (
             <div className="flex flex-col items-center gap-4">
               <img
                 src={qrUrl}
@@ -100,7 +109,7 @@ export default function DashboardHome() {
             </div>
           ) : (
             <div className="flex items-center justify-center h-48 text-gray-400">
-              Loading QR code...
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-300" />
             </div>
           )}
         </div>

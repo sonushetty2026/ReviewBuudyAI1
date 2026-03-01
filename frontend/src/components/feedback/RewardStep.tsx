@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { flowApi } from "../../api/flow";
 import { useFlowStore } from "../../stores/flowStore";
 
@@ -36,7 +37,7 @@ export default function RewardStep({ sessionId }: Props) {
         setSmsSent(true);
       }
     } catch {
-      // ignore
+      toast.error("Couldn't send SMS. Please write down your code.");
     } finally {
       setSendingSms(false);
     }

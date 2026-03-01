@@ -37,7 +37,7 @@ export default function GoogleReviewStep({ sessionId }: Props) {
     // Move to return check after a moment
     setTimeout(() => {
       setCurrentStep("return_check");
-    }, 2000);
+    }, googleReviewUrl ? 2000 : 1000);
   };
 
   return (
@@ -66,8 +66,18 @@ export default function GoogleReviewStep({ sessionId }: Props) {
           className="w-full mt-6 py-3 px-6 rounded-xl text-white font-semibold shadow-lg transition-all"
           style={{ backgroundColor: business?.branding.primary_color }}
         >
-          {copied ? "Copied! Opening Google..." : "Copy & Open Google Reviews"}
+          {copied
+            ? googleReviewUrl
+              ? "Copied! Opening Google..."
+              : "Copied to clipboard!"
+            : "Copy & Open Google Reviews"}
         </button>
+
+        {!googleReviewUrl && (
+          <p className="mt-2 text-xs text-gray-400 text-center">
+            Search for "{business?.name}" on Google to paste your review.
+          </p>
+        )}
 
         <button
           onClick={() => setCurrentStep("return_check")}
