@@ -127,8 +127,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
+    <div className="max-w-2xl w-full">
+      <h2 className="text-xl md:text-2xl font-bold text-gray-900">Settings</h2>
 
       {/* Business Info */}
       <div className="mt-6 bg-white rounded-xl shadow-sm p-6">
@@ -328,7 +328,7 @@ export default function SettingsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Type
@@ -408,26 +408,27 @@ export default function SettingsPage() {
             {rewards.map((reward) => (
               <div
                 key={reward.id}
-                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                className="flex items-start justify-between gap-3 p-3 border border-gray-200 rounded-lg"
               >
-                <div>
-                  <span className="font-medium text-gray-900">
-                    {reward.name}
-                  </span>
-                  <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                    {reward.reward_type}
-                  </span>
-                  {!reward.is_active && (
-                    <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600">
-                      inactive
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-medium text-gray-900 truncate">
+                      {reward.name}
                     </span>
-                  )}
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    {reward.reward_value} &middot; {reward.expiry_days} day
-                    expiry
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 shrink-0">
+                      {reward.reward_type}
+                    </span>
+                    {!reward.is_active && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 shrink-0">
+                        inactive
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-0.5 truncate">
+                    {reward.reward_value} &middot; {reward.expiry_days} day expiry
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => startEdit(reward)}
                     className="text-sm text-primary-600 hover:text-primary-800"

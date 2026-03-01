@@ -19,8 +19,14 @@ const pageTitles: Record<string, string> = {
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, setUser, logout, loadFromStorage } = useAuthStore();
+  const { user, setUser, loadFromStorage } = useAuthStore();
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar whenever route changes (mobile nav tap)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const init = async () => {
@@ -50,8 +56,20 @@ export default function DashboardLayout() {
 
   return (
     <div className="min-h-screen flex bg-gray-50">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      {/* Mobile backdrop overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — fixed drawer on mobile, static on md+ */}
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-200 md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="p-6 border-b border-gray-200">
           <h1 className="text-xl font-bold text-primary-600">Scan & Speak</h1>
           {user && (
@@ -72,7 +90,7 @@ export default function DashboardLayout() {
                     : "text-gray-600 hover:bg-gray-100"
                 }`}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
                 </svg>
                 {item.label}
@@ -80,18 +98,29 @@ export default function DashboardLayout() {
             );
           })}
         </nav>
-
       </aside>
 
       {/* Main area: header + content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Top header bar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0">
-          <h1 className="text-lg font-semibold text-gray-900">
-            {pageTitles[location.pathname] || "Dashboard"}
-          </h1>
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 shrink-0">
+          <div className="flex items-center gap-3">
+            {/* Hamburger button — mobile only */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Open menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 className="text-lg font-semibold text-gray-900">
+              {pageTitles[location.pathname] || "Dashboard"}
+            </h1>
+          </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             {/* Notification bell */}
             <button className="relative p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,7 +135,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-8 overflow-auto">
+        <main className="flex-1 p-4 md:p-8 overflow-auto">
           <Outlet />
         </main>
       </div>

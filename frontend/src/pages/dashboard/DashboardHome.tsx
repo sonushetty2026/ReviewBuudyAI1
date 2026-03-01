@@ -52,10 +52,10 @@ export default function DashboardHome() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900">
+      <h2 className="text-xl md:text-2xl font-bold text-gray-900 truncate">
         {business ? `Welcome, ${business.name}` : "Dashboard"}
       </h2>
-      <p className="mt-2 text-gray-600">Your review concierge overview</p>
+      <p className="mt-1 text-sm md:text-base text-gray-600">Your review concierge overview</p>
 
       {/* Stats cards */}
       <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -85,7 +85,7 @@ export default function DashboardHome() {
               <img
                 src={qrUrl}
                 alt="Customer flow QR code"
-                className="w-48 h-48"
+                className="w-40 h-40 sm:w-48 sm:h-48"
               />
               <p className="text-sm text-gray-500 break-all text-center">
                 {customerUrl}

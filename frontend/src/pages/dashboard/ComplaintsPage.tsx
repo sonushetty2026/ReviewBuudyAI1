@@ -84,11 +84,11 @@ export default function ComplaintsPage() {
 
   return (
     <div className="max-w-4xl">
-      <h2 className="text-2xl font-bold text-gray-900">Complaints</h2>
+      <h2 className="text-xl md:text-2xl font-bold text-gray-900">Complaints</h2>
       <p className="mt-1 text-sm text-gray-500">Customer feedback that needs attention</p>
 
       {/* Filters */}
-      <div className="mt-4 flex gap-3">
+      <div className="mt-4 flex flex-wrap gap-3">
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
@@ -140,11 +140,11 @@ export default function ComplaintsPage() {
                     <span>{new Date(c.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 ml-4">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${priorityColors[c.priority] || ""}`}>
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 ml-3 shrink-0">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${priorityColors[c.priority] || ""}`}>
                     {c.priority}
                   </span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[c.status] || ""}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${statusColors[c.status] || ""}`}>
                     {c.status.replace("_", " ")}
                   </span>
                 </div>
@@ -158,7 +158,7 @@ export default function ComplaintsPage() {
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setSelected(null)}>
           <div
-            className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto p-6"
+            className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-3 sm:mx-4 max-h-[85vh] overflow-y-auto p-4 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -176,7 +176,7 @@ export default function ComplaintsPage() {
                 <p className="text-sm text-gray-900">{selected.summary}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Customer</p>
                   <p className="text-sm text-gray-900">{selected.customer_name || "—"}</p>
@@ -194,12 +194,12 @@ export default function ComplaintsPage() {
                 {selected.customer_email && (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Email</p>
-                    <p className="text-sm text-gray-900">{selected.customer_email}</p>
+                    <p className="text-sm text-gray-900 break-all">{selected.customer_email}</p>
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Status</label>
                   <select
