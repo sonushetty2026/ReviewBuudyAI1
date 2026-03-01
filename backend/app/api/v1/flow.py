@@ -98,9 +98,11 @@ async def get_heygen_token():
             resp.raise_for_status()
             data = resp.json()
 
+        # Response shape: { code, data: { session_id, session_token }, message }
+        inner = data.get("data", data)
         return {
-            "token": data.get("session_token", ""),
-            "session_id": data.get("session_id", ""),
+            "token": inner.get("session_token", ""),
+            "session_id": inner.get("session_id", ""),
             "provider": "liveavatar",
         }
 

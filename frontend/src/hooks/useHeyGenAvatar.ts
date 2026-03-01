@@ -66,13 +66,9 @@ export function useHeyGenAvatar() {
           timeoutRef.current = null;
         }
 
-        // Attach the avatar video stream to our video element
+        // Attach the avatar video/audio tracks to our video element
         if (videoRef.current) {
-          const mediaStream = (session as any).mediaStream;
-          if (mediaStream) {
-            videoRef.current.srcObject = mediaStream;
-            videoRef.current.play().catch(() => {});
-          }
+          session.attach(videoRef.current);
         }
 
         setIsAvatarReady(true);
@@ -116,7 +112,7 @@ export function useHeyGenAvatar() {
   const speakText = useCallback(async (text: string) => {
     if (!sessionRef.current || avatarTimedOutRef.current) return;
     try {
-      await (sessionRef.current as any).repeat(text);
+      sessionRef.current.repeat(text);
     } catch (err: any) {
       console.error("Avatar speak error:", err);
     }
