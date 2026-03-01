@@ -73,3 +73,5 @@ export type ConversationStep =
   | "contact_collection"
   | "reward"
   | "thank_you";
+
+export type PresentationMode = "fast" | "camera";

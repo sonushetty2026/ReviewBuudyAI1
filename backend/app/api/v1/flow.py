@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -42,6 +43,8 @@ from app.services import (
     review_writer,
     reward_service,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/flow", tags=["customer-flow"])
 
@@ -135,6 +138,7 @@ async def start_session(
     session = FeedbackSession(
         business_id=business.id,
         status="active",
+        presentation_mode=body.presentation_mode,
         device_fingerprint=body.visitor_id,
         ip_address=request.client.host if request.client else None,
     )
@@ -142,12 +146,21 @@ async def start_session(
     await db.flush()
 
     # Generate greeting
-    greeting_response = await ai_conversation.get_conversation_response(
-        messages=[{"role": "user", "content": "Start the conversation."}],
-        business_name=business.name,
-        avatar_style=branding.avatar_style if branding else "friendly",
-        welcome_message=branding.welcome_message if branding else "",
-    )
+    try:
+        greeting_response = await ai_conversation.get_conversation_response(
+            messages=[{"role": "user", "content": "Start the conversation."}],
+            business_name=business.name,
+            avatar_style=branding.avatar_style if branding else "friendly",
+            welcome_message=branding.welcome_message if branding else "",
+        )
+    except Exception as e:
+        logger.error(f"AI greeting generation failed: {e}", exc_info=True)
+        welcome = branding.welcome_message if branding and branding.welcome_message else "How was your experience today?"
+        greeting_response = {
+            "text": f"Welcome to {business.name}! {welcome}",
+            "state": "greeting",
+            "ready_to_complete": False,
+        }
 
     greeting_msg = ConversationMessage(
         session_id=session.id,
