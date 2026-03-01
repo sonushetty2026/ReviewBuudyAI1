@@ -290,10 +290,21 @@ async def complete_session(
     )
     business = biz_result.scalar_one()
 
-    # Analyze sentiment
-    analysis = await ai_conversation.analyze_sentiment_and_extract(
-        conversation_text, business.name
-    )
+    # Analyze sentiment — wrap in try/except so Claude outages don't strand the user
+    try:
+        analysis = await ai_conversation.analyze_sentiment_and_extract(
+            conversation_text, business.name
+        )
+    except Exception as e:
+        logger.error(f"Sentiment analysis failed: {e}", exc_info=True)
+        # Fallback: treat as negative so a complaint is created and the flow completes
+        analysis = {
+            "sentiment_label": "negative",
+            "sentiment_score": 0,
+            "star_rating": 3,
+            "key_topics": [],
+            "summary": "Customer submitted feedback (analysis unavailable).",
+        }
 
     # Update session
     session.status = "completed"
@@ -309,12 +320,17 @@ async def complete_session(
 
     if analysis["sentiment_label"] == "positive" and analysis["star_rating"] >= 4:
         # Positive flow: rewrite review
-        rewritten = await review_writer.rewrite_review(
-            conversation_text=conversation_text,
-            business_name=business.name,
-            star_rating=analysis["star_rating"],
-            key_topics=analysis.get("key_topics", []),
-        )
+        try:
+            rewritten = await review_writer.rewrite_review(
+                conversation_text=conversation_text,
+                business_name=business.name,
+                star_rating=analysis["star_rating"],
+                key_topics=analysis.get("key_topics", []),
+            )
+        except Exception as e:
+            logger.error(f"Review rewrite failed: {e}", exc_info=True)
+            # Fallback: use the raw conversation text trimmed to a reasonable length
+            rewritten = conversation_text[:500].strip()
         session.rewritten_review = rewritten
     else:
         # Negative flow: create complaint

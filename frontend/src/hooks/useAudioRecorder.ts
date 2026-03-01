@@ -19,12 +19,21 @@ export function useAudioRecorder({ sessionId, onTranscript }: UseAudioRecorderOp
       setError(null);
       setPermissionDenied(false);
 
+      // Guard: getUserMedia requires HTTPS on mobile browsers
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setPermissionDenied(true);
+        setError("Microphone not supported. Please use HTTPS or type instead.");
+        return;
+      }
+
       // Get microphone access
+      // Note: sampleRate constraint intentionally omitted — iOS Safari throws
+      // OverconstrainedError if sampleRate is specified. The AudioContext below
+      // handles resampling to 16000 Hz regardless of device sample rate.
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: {
-            sampleRate: 16000,
             channelCount: 1,
             echoCancellation: true,
             noiseSuppression: true,
@@ -72,12 +81,18 @@ export function useAudioRecorder({ sessionId, onTranscript }: UseAudioRecorderOp
         ws.onerror = () => reject(new Error("WebSocket connection failed"));
       });
 
-      // Set up audio processing - send PCM16 chunks
+      // Set up audio processing at 16000 Hz — AudioContext resamples from device rate
       const audioContext = new AudioContext({ sampleRate: 16000 });
       audioContextRef.current = audioContext;
+
+      // Resume AudioContext if suspended (required after user gesture on iOS)
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
       const source = audioContext.createMediaStreamSource(stream);
 
-      // Use ScriptProcessorNode to capture raw audio
+      // ScriptProcessorNode: captures raw PCM16 chunks to send over WebSocket
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 

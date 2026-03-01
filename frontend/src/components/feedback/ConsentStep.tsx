@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { flowApi } from "../../api/flow";
 import { useFlowStore } from "../../stores/flowStore";
 
@@ -23,6 +24,7 @@ export default function ConsentStep({ sessionId }: Props) {
         setCurrentStep("reward");
       }
     } catch {
+      toast.error("Something went wrong. Please try again.");
       setSubmitting(false);
     }
   };

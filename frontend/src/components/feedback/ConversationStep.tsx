@@ -68,12 +68,14 @@ export default function ConversationStep({ sessionId }: Props) {
     }
   }, [session?.greeting]);
 
-  // Start recording if voice mode and avatar ready
+  // Start recording when avatar is ready OR when avatar has failed (don't block voice on HeyGen)
   useEffect(() => {
-    if (inputMode === "voice" && isAvatarReady && !isRecording && !permissionDenied) {
-      startRecording();
+    if (inputMode === "voice" && !isRecording && !permissionDenied) {
+      if (isAvatarReady || avatarError) {
+        startRecording();
+      }
     }
-  }, [inputMode, isAvatarReady]);
+  }, [inputMode, isAvatarReady, avatarError]);
 
   // Auto-scroll messages
   useEffect(() => {
